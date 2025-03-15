@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import { config } from 'dotenv';
 import { DataSource } from 'typeorm';
 import { dbConfig } from './config/database';
+import authRoutes from './routes/auth.routes';
 
 // Load environment variables
 config();
@@ -32,13 +33,16 @@ AppDataSource.initialize()
     console.error('Error connecting to database:', error);
   });
 
+// Routes
+app.use('/api/auth', authRoutes);
+
 // Health check route
-app.get('/health', (_req: Request, res: Response) => {
+app.get('/health', (_req: Request, res: Response): void => {
   res.status(200).json({ status: 'OK', message: 'Server is running' });
 });
 
 // Error handling middleware
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction): void => {
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
 });
