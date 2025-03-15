@@ -15,7 +15,7 @@ export class User implements IUser {
   @Column({ unique: true })
   email: string;
 
-  @Column({ select: false })
+  @Column()
   password: string;
 
   @Column({
@@ -30,6 +30,9 @@ export class User implements IUser {
 
   @Column({ default: true })
   isActive: boolean;
+
+  @Column({ nullable: true, type: 'text' })
+  refreshToken: string;
 
   @OneToMany('Property', 'owner')
   properties: IProperty[];

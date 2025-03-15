@@ -9,7 +9,10 @@ export class Property implements IProperty {
   id: string;
 
   @Column()
-  name: string;
+  title: string;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  price: number;
 
   @Column({
     type: 'enum',

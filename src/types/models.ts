@@ -1,7 +1,6 @@
 export enum UserRole {
   ADMIN = 'admin',
-  OWNER = 'owner',
-  MANAGER = 'manager',
+  LANDLORD = 'landlord',
   TENANT = 'tenant'
 }
 
@@ -42,17 +41,11 @@ export interface IUser {
 
 export interface IProperty {
   id: string;
-  name: string;
-  type: PropertyType;
+  title: string;
+  description: string;
   address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  description?: string;
-  totalArea?: number;
-  isActive: boolean;
+  price: number;
   owner: IUser;
-  units?: IUnit[];
   createdAt: Date;
   updatedAt: Date;
 }
