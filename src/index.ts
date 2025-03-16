@@ -73,17 +73,37 @@ export const AppDataSource = new DataSource(dbConfig);
 
 const startServer = async () => {
   try {
+    logger.info('Starting server initialization...');
+    logger.info('Database config:', {
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      database: process.env.DB_NAME,
+      username: process.env.DB_USER
+    });
+
     await AppDataSource.initialize();
     logger.info('Database connection established');
 
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
       logger.info(`Server is running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+      logger.info(`CORS origin: ${process.env.CORS_ORIGIN}`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);
+    if (error instanceof Error) {
+      logger.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+    }
     process.exit(1);
   }
 };
 
-startServer(); 
+// Start the server
+startServer().catch((error) => {
+  logger.error('Unhandled server startup error:', error);
+  process.exit(1);
+}); 
