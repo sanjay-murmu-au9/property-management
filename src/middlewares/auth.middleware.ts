@@ -3,11 +3,16 @@ import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
 import { AppDataSource } from '../index';
 
-export interface AuthRequest extends Request {
-  user?: User;
+// Extend Express Request type with proper User type
+declare global {
+  namespace Express {
+    interface Request {
+      user?: User;
+    }
+  }
 }
 
-export const auth = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+export const auth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
 

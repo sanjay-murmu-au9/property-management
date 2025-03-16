@@ -6,48 +6,80 @@ import morgan from 'morgan';
 import { config } from 'dotenv';
 import { DataSource } from 'typeorm';
 import { dbConfig } from './config/database';
-import authRoutes from './routes/auth.routes';
+import routes from './routes';
+import logger from './utils/logger';
 
 // Load environment variables
 config();
 
+// Initialize Express app
 const app = express();
-const port = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
-app.use(helmet());
-app.use(morgan('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Database connection
+// Initialize TypeORM connection
 export const AppDataSource = new DataSource(dbConfig);
-
-// Initialize database connection
 AppDataSource.initialize()
   .then(() => {
-    console.log('Database connection established');
+    logger.info('Database connection established');
   })
-  .catch((error: Error) => {
-    console.error('Error connecting to database:', error);
+  .catch((error) => {
+    logger.error('Database connection failed:', error);
   });
 
-// Routes
-app.use('/api/auth', authRoutes);
+// Production security configurations
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
 
-// Health check route
-app.get('/health', (_req: Request, res: Response): void => {
-  res.status(200).json({ status: 'OK', message: 'Server is running' });
+// Middleware
+app.use(cors(corsOptions));
+app.use(helmet());
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Health check endpoint
+app.get('/api/health', (_req: Request, res: Response) => {
+  const healthcheck = {
+    uptime: process.uptime(),
+    message: 'OK',
+    timestamp: Date.now()
+  };
+  try {
+    res.send(healthcheck);
+  } catch (error) {
+    healthcheck.message = error instanceof Error ? error.message : 'Error';
+    res.status(503).send(healthcheck);
+  }
 });
 
-// Error handling middleware
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction): void => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+// Routes
+app.use('/api', routes);
+
+// Global error handler
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  logger.error('Unhandled error:', err);
+  res.status(500).json({
+    success: false,
+    message: process.env.NODE_ENV === 'production' 
+      ? 'Internal Server Error' 
+      : err.message
+  });
+});
+
+// Handle 404
+app.use((req: Request, res: Response) => {
+  logger.warn(`Route not found: ${req.method} ${req.url}`);
+  res.status(404).json({
+    success: false,
+    message: 'Route not found'
+  });
 });
 
 // Start server
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  logger.info(`Server is running on port ${PORT} in ${process.env.NODE_ENV} mode`);
 }); 
