@@ -2,15 +2,21 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../index';
 import { User } from '../models/User';
 import bcrypt from 'bcryptjs';
-import jwt, { SignOptions, Secret, JwtPayload } from 'jsonwebtoken';
+import jwt, { SignOptions, Secret } from 'jsonwebtoken';
 import { UserRole } from '../types/models';
-
-interface TokenPayload extends JwtPayload {
-  userId: string;
-  email?: string;
-}
+import logger from '../utils/logger';
+import { Repository } from 'typeorm';
 
 export class AuthController {
+  private userRepository: Repository<User>;
+
+  constructor() {
+    // Initialize repository after database connection
+    setTimeout(() => {
+      this.userRepository = AppDataSource.getRepository(User);
+    }, 0);
+  }
+
   private generateTokens(user: User): { accessToken: string; refreshToken: string } {
     const jwtSecret: Secret = process.env.JWT_SECRET || 'default_jwt_secret';
     const refreshSecret: Secret = process.env.REFRESH_TOKEN_SECRET || 'default_refresh_secret';
@@ -32,27 +38,21 @@ export class AuthController {
     return { accessToken, refreshToken };
   }
 
-  private async verifyRefreshToken(token: string): Promise<TokenPayload> {
-    try {
-      const secret: Secret = process.env.REFRESH_TOKEN_SECRET || 'default_refresh_secret';
-      const decoded = jwt.verify(token, secret) as TokenPayload;
-      return decoded;
-    } catch (error) {
-      if (error instanceof jwt.TokenExpiredError) {
-        throw new Error('Refresh token has expired');
-      }
-      throw new Error('Invalid refresh token');
+  private async getRepository(): Promise<Repository<User>> {
+    if (!this.userRepository) {
+      this.userRepository = AppDataSource.getRepository(User);
     }
+    return this.userRepository;
   }
 
   public async signup(req: Request, res: Response): Promise<void> {
     try {
       const { email, password, firstName, lastName, role } = req.body;
       
-      const userRepository = AppDataSource.getRepository(User);
+      const repository = await this.getRepository();
       
       // Check if user already exists
-      const existingUser = await userRepository.findOne({ 
+      const existingUser = await repository.findOne({ 
         where: { email },
         select: ['id', 'email'] // Only select necessary fields
       });
@@ -66,7 +66,7 @@ export class AuthController {
       const hashedPassword = await bcrypt.hash(password, 10);
       
       // Create new user
-      const user = userRepository.create({
+      const user = repository.create({
         email,
         password: hashedPassword,
         firstName,
@@ -75,14 +75,14 @@ export class AuthController {
         isActive: true
       });
       
-      await userRepository.save(user);
+      await repository.save(user);
       
       // Generate tokens
       const { accessToken, refreshToken } = this.generateTokens(user);
 
       // Save refresh token to user
       user.refreshToken = refreshToken;
-      await userRepository.save(user);
+      await repository.save(user);
       
       res.status(201).json({
         message: 'User created successfully',
@@ -97,133 +97,155 @@ export class AuthController {
         }
       });
     } catch (error) {
-      console.error('Signup error:', error);
+      logger.error('Signup error:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
   }
 
-  public async login(req: Request, res: Response): Promise<void> {
+  public login = async (req: Request, res: Response): Promise<void> => {
     try {
       const { email, password } = req.body;
-      
-      const userRepository = AppDataSource.getRepository(User);
-      
-      // Find user with password and refresh token
-      const user = await userRepository.findOne({
-        where: { email },
-        select: ['id', 'email', 'password', 'firstName', 'lastName', 'role', 'isActive', 'refreshToken']
-      });
+      const repository = await this.getRepository();
 
-      if (!user || !user.isActive) {
-        res.status(401).json({ message: 'Invalid credentials' });
+      // Validate input
+      if (!email || !password) {
+        res.status(400).json({
+          success: false,
+          message: 'Email and password are required'
+        });
         return;
       }
-      
-      // Check password
+
+      // Find user
+      const user = await repository.findOne({ where: { email } });
+      if (!user) {
+        res.status(401).json({
+          success: false,
+          message: 'Invalid credentials'
+        });
+        return;
+      }
+
+      // Verify password
       const isValidPassword = await bcrypt.compare(password, user.password);
       if (!isValidPassword) {
-        res.status(401).json({ message: 'Invalid credentials' });
+        res.status(401).json({
+          success: false,
+          message: 'Invalid credentials'
+        });
         return;
       }
-      
+
       // Generate tokens
       const { accessToken, refreshToken } = this.generateTokens(user);
 
       // Save refresh token to user
       user.refreshToken = refreshToken;
-      await userRepository.save(user);
-      
+      await repository.save(user);
+
       res.status(200).json({
-        message: 'Login successful',
-        accessToken,
-        refreshToken,
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role
+        success: true,
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role
+          },
+          accessToken,
+          refreshToken
         }
       });
     } catch (error) {
-      console.error('Login error:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      logger.error('Login error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
     }
-  }
+  };
 
-  public async refreshToken(req: Request, res: Response): Promise<void> {
+  public refreshToken = async (req: Request, res: Response): Promise<void> => {
     try {
       const { refreshToken } = req.body;
+      const repository = await this.getRepository();
 
       if (!refreshToken) {
-        res.status(401).json({ message: 'Refresh token is required' });
+        res.status(400).json({
+          success: false,
+          message: 'Refresh token is required'
+        });
         return;
       }
 
-      // Verify the refresh token
-      const decoded = await this.verifyRefreshToken(refreshToken);
-      
-      const userRepository = AppDataSource.getRepository(User);
-      
-      // Find user with the refresh token
-      const user = await userRepository.findOne({
-        where: { 
-          id: decoded.userId,
-          refreshToken,
-          isActive: true
-        }
+      // Find user with refresh token
+      const user = await repository.findOne({
+        where: { refreshToken }
       });
 
       if (!user) {
-        res.status(401).json({ message: 'Invalid refresh token' });
+        res.status(401).json({
+          success: false,
+          message: 'Invalid refresh token'
+        });
         return;
       }
 
-      // Generate new tokens
-      const tokens = this.generateTokens(user);
+      // Verify refresh token
+      try {
+        jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET || 'your-refresh-secret-key');
+      } catch (error) {
+        res.status(401).json({
+          success: false,
+          message: 'Invalid refresh token'
+        });
+        return;
+      }
 
-      // Update refresh token in database
-      user.refreshToken = tokens.refreshToken;
-      await userRepository.save(user);
+      // Generate new access token
+      const accessToken = jwt.sign(
+        { userId: user.id, role: user.role },
+        process.env.JWT_SECRET || 'your-secret-key',
+        { expiresIn: '15m' }
+      );
 
-      res.json({
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken
+      res.status(200).json({
+        success: true,
+        data: { accessToken }
       });
     } catch (error) {
-      if (error instanceof Error) {
-        res.status(401).json({ message: error.message });
-        return;
-      }
-      console.error('Refresh token error:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      logger.error('Refresh token error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
     }
-  }
+  };
 
   public async logout(req: Request, res: Response): Promise<void> {
     try {
       const { refreshToken } = req.body;
+      const repository = await this.getRepository();
       
       if (!refreshToken) {
         res.status(400).json({ message: 'Refresh token is required' });
         return;
       }
 
-      const userRepository = AppDataSource.getRepository(User);
-
       // Find user with refresh token and remove it
-      const user = await userRepository.findOne({
+      const user = await repository.findOne({
         where: { refreshToken }
       });
 
       if (user) {
         user.refreshToken = '';
-        await userRepository.save(user);
+        await repository.save(user);
       }
 
       res.json({ message: 'Logged out successfully' });
     } catch (error) {
-      console.error('Logout error:', error);
+      logger.error('Logout error:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
   }
@@ -231,21 +253,21 @@ export class AuthController {
   public async googleAuthCallback(req: Request, res: Response): Promise<void> {
     try {
       const user = req.user as User;
+      const repository = await this.getRepository();
       
       // Generate tokens
       const { accessToken, refreshToken } = this.generateTokens(user);
 
       // Save refresh token to user
-      const userRepository = AppDataSource.getRepository(User);
       user.refreshToken = refreshToken;
-      await userRepository.save(user);
+      await repository.save(user);
       
       // Redirect to frontend with tokens
       res.redirect(
         `${process.env.FRONTEND_URL}/auth/google/success?accessToken=${accessToken}&refreshToken=${refreshToken}`
       );
     } catch (error) {
-      console.error('Google auth callback error:', error);
+      logger.error('Google auth callback error:', error);
       res.redirect('/login?error=auth_failed');
     }
   }

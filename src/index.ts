@@ -15,16 +15,6 @@ config();
 // Initialize Express app
 const app = express();
 
-// Initialize TypeORM connection
-export const AppDataSource = new DataSource(dbConfig);
-AppDataSource.initialize()
-  .then(() => {
-    logger.info('Database connection established');
-  })
-  .catch((error) => {
-    logger.error('Database connection failed:', error);
-  });
-
 // Production security configurations
 const corsOptions = {
   origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
@@ -78,8 +68,22 @@ app.use((req: Request, res: Response) => {
   });
 });
 
-// Start server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  logger.info(`Server is running on port ${PORT} in ${process.env.NODE_ENV} mode`);
-}); 
+// Initialize TypeORM connection and start server
+export const AppDataSource = new DataSource(dbConfig);
+
+const startServer = async () => {
+  try {
+    await AppDataSource.initialize();
+    logger.info('Database connection established');
+
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+      logger.info(`Server is running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+    });
+  } catch (error) {
+    logger.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer(); 
