@@ -34,12 +34,33 @@ if (fs.existsSync(migrationsDir)) {
         content = content.replace('export default class', 'module.exports = class');
         content = content.replace('export class', 'module.exports = class');
 
+        // Handle import statements
+        content = content.replace(/import\s+{([^}]+)}\s+from\s+['"]([^'"]+)['"]/g, 'const {$1} = require("$2")');
+
         // Write the modified content to the destination file
         fs.writeFileSync(destPath, content);
         console.log(`Copied: ${file} -> ${path.basename(destPath)}`);
     });
 
     console.log('Migration files copied successfully!');
+
+    // Remove all TypeScript migration files from the source directory in dist
+    // to prevent TypeORM from trying to load them directly
+    console.log('Removing TypeScript migration files to prevent loading issues...');
+    try {
+        // Create a .js-only migrations directory in the final build
+        if (fs.existsSync(path.join(__dirname, '..', 'migrations'))) {
+            fs.readdirSync(path.join(__dirname, '..', 'migrations')).forEach(file => {
+                if (file.endsWith('.ts')) {
+                    // Delete any TypeScript files from the source directory to prevent TypeORM from finding them
+                    fs.unlinkSync(path.join(__dirname, '..', 'migrations', file));
+                    console.log(`Removed TypeScript file: ${file}`);
+                }
+            });
+        }
+    } catch (err) {
+        console.error('Warning: Failed to clean up TypeScript migration files:', err);
+    }
 } else {
     console.log('No migrations directory found.');
 }
@@ -122,6 +143,20 @@ if (missingFiles) {
             console.log('Created data-source.js from TypeScript source');
         }
     }
+}
+
+// Set NODE_ENV for production in a .env file if it doesn't exist
+const envPath = path.join(rootDir, '.env');
+if (!fs.existsSync(envPath)) {
+    console.log('Creating .env file for production...');
+    fs.writeFileSync(envPath, 'NODE_ENV=production\n');
+} else {
+    // Make sure NODE_ENV is set to production
+    let envContent = fs.readFileSync(envPath, 'utf8');
+    if (!envContent.includes('NODE_ENV=production')) {
+        fs.appendFileSync(envPath, '\nNODE_ENV=production\n');
+    }
+    console.log('Updated .env file with NODE_ENV=production');
 }
 
 console.log('Build process completed.');
