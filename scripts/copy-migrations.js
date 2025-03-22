@@ -1,11 +1,12 @@
-const fs = require('fs');
+const fs = require('fs-extra');
 const path = require('path');
+
+// Ensure dist directory exists
+fs.ensureDirSync(path.join(__dirname, '..', 'dist'));
 
 // Create dist/migrations directory if it doesn't exist
 const distMigrationsDir = path.join(__dirname, '..', 'dist', 'migrations');
-if (!fs.existsSync(distMigrationsDir)) {
-  fs.mkdirSync(distMigrationsDir, { recursive: true });
-}
+fs.ensureDirSync(distMigrationsDir);
 
 // Read migration files from source
 const migrationsDir = path.join(__dirname, '..', 'migrations');
@@ -38,4 +39,18 @@ if (fs.existsSync(migrationsDir)) {
   console.log('Migration files copied successfully!');
 } else {
   console.log('No migrations directory found.');
+}
+
+// Copy index.js after TypeScript compilation
+const srcIndexPath = path.join(__dirname, '..', 'dist', 'src', 'index.js');
+const destIndexPath = path.join(__dirname, '..', 'dist', 'index.js');
+
+// Check if the source index.js file exists
+if (fs.existsSync(srcIndexPath)) {
+  // Copy the file
+  fs.copyFileSync(srcIndexPath, destIndexPath);
+  console.log('Copied index.js to dist/ root directory');
+} else {
+  console.error('Error: src/index.js was not found after TypeScript compilation');
+  process.exit(1);
 }
