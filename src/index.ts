@@ -1,4 +1,10 @@
 import 'reflect-metadata';
+// Register module handler for TypeORM
+// This helps with ES module compatibility issues
+if (typeof (module as any).register === 'function') {
+  (module as any).register("ts-node/register", { transpileOnly: true });
+}
+
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -53,8 +59,8 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   logger.error('Unhandled error:', err);
   res.status(500).json({
     success: false,
-    message: process.env.NODE_ENV === 'production' 
-      ? 'Internal Server Error' 
+    message: process.env.NODE_ENV === 'production'
+      ? 'Internal Server Error'
       : err.message
   });
 });
@@ -133,4 +139,4 @@ const startServer = async () => {
 startServer().catch((error) => {
   logger.error('Unhandled server startup error:', error);
   process.exit(1);
-}); 
+});

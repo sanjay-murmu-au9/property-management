@@ -21,11 +21,12 @@ if (process.env.DATABASE_URL) {
 
 // Create basic configuration
 const baseConfig = {
-  entities: [path.join(__dirname, '..', 'models', '*.{ts,js}')],
-  migrations: [path.join(__dirname, '..', '..', 'migrations', '*.{ts,js}')],
+  entities: [path.join(__dirname, '..', 'models', '*.{js,ts}')],
+  migrations: [path.join(__dirname, '..', '..', 'migrations', '*.{js,ts}')],
+  migrationsTableName: "migrations_history",
   synchronize: process.env.NODE_ENV === 'development',
   logging: process.env.NODE_ENV === 'development',
-  ssl: true,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   extra: {
     max: 10 // connection pool max size
   }
