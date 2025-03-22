@@ -22,7 +22,7 @@ export const auth = async (req: Request, res: Response, next: NextFunction): Pro
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret') as { id: string };
-    const user = await AppDataSource.getRepository(User).findOne({ 
+    const user = await AppDataSource.getRepository(User).findOne({
       where: { id: decoded.id, isActive: true }
     });
 
