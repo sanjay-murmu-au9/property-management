@@ -19,37 +19,24 @@ if (process.env.DATABASE_URL) {
   }
 }
 
-// Log database configuration (excluding sensitive data)
-if (!process.env.DATABASE_URL) {
-  logger.info('Database configuration:', {
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    database: process.env.DB_NAME,
-    username: process.env.DB_USER,
-    ssl: process.env.NODE_ENV === 'production'
-  });
-}
-
-// Configure SSL
-const sslConfig = {
-  ssl: {
-    rejectUnauthorized: false
+// Create basic configuration
+const baseConfig = {
+  entities: [path.join(__dirname, '..', 'models', '*.{ts,js}')],
+  migrations: [path.join(__dirname, '..', '..', 'migrations', '*.{ts,js}')],
+  synchronize: process.env.NODE_ENV === 'development',
+  logging: process.env.NODE_ENV === 'development',
+  ssl: true,
+  extra: {
+    max: 10 // connection pool max size
   }
 };
 
-// Create config either from DATABASE_URL or individual parameters
+// Export final configuration
 export const dbConfig: DataSourceOptions = process.env.DATABASE_URL
   ? {
       type: 'postgres',
       url: process.env.DATABASE_URL,
-      entities: [path.join(__dirname, '..', 'models', '*.{ts,js}')],
-      migrations: process.env.NODE_ENV === 'development' ? [] : [path.join(__dirname, '..', '..', 'migrations', '*.{ts,js}')],
-      synchronize: process.env.NODE_ENV === 'development',
-      logging: process.env.NODE_ENV === 'development',
-      ssl: true,
-      extra: {
-        max: 10 // connection pool max size
-      }
+      ...baseConfig
     }
   : {
       type: 'postgres',
@@ -58,13 +45,5 @@ export const dbConfig: DataSourceOptions = process.env.DATABASE_URL
       username: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
-      entities: [path.join(__dirname, '..', 'models', '*.{ts,js}')],
-      migrations: process.env.NODE_ENV === 'development' ? [] : [path.join(__dirname, '..', '..', 'migrations', '*.{ts,js}')],
-      synchronize: process.env.NODE_ENV === 'development',
-      logging: process.env.NODE_ENV === 'development',
-      ...sslConfig,
-      connectTimeoutMS: 30000, // 30 seconds
-      extra: {
-        max: 10 // connection pool max size
-      }
+      ...baseConfig
     };

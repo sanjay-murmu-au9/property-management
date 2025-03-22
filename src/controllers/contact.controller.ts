@@ -25,52 +25,36 @@ export class ContactController {
         return;
       }
 
-      // Start a transaction
-      const queryRunner = AppDataSource.createQueryRunner();
-      await queryRunner.connect();
-      await queryRunner.startTransaction();
+      // Use repository approach without explicit transaction
+      const contactRepo = AppDataSource.getRepository(Contact);
 
-      try {
-        // Get contact repository
-        const contactRepo = queryRunner.manager.getRepository(Contact);
+      // Check if email exists
+      const existingContact = await contactRepo.findOne({
+        where: { email }
+      });
 
-        // Check if email exists
-        const existingContact = await contactRepo.findOne({
-          where: { email }
+      if (existingContact) {
+        res.status(400).json({
+          success: false,
+          message: 'Email already exists'
         });
-
-        if (existingContact) {
-          await queryRunner.rollbackTransaction();
-          res.status(400).json({
-            success: false,
-            message: 'Email already exists'
-          });
-          return;
-        }
-
-        // Create and save contact
-        const newContact = contactRepo.create({
-          name: validator.escape(name.trim()),
-          email: email.toLowerCase().trim(),
-          comments: validator.escape(comments.trim())
-        });
-
-        const savedContact = await contactRepo.save(newContact);
-        await queryRunner.commitTransaction();
-
-        res.status(201).json({
-          success: true,
-          message: 'Contact form submitted successfully',
-          data: savedContact
-        });
-      } catch (txError) {
-        // Rollback transaction on error
-        await queryRunner.rollbackTransaction();
-        throw txError; // Re-throw to be caught by outer catch
-      } finally {
-        // Release query runner
-        await queryRunner.release();
+        return;
       }
+
+      // Create and save contact
+      const newContact = contactRepo.create({
+        name: validator.escape(name.trim()),
+        email: email.toLowerCase().trim(),
+        comments: validator.escape(comments.trim())
+      });
+
+      const savedContact = await contactRepo.save(newContact);
+
+      res.status(201).json({
+        success: true,
+        message: 'Contact form submitted successfully',
+        data: savedContact
+      });
     } catch (error) {
       console.error('Error submitting contact form:', error);
       res.status(500).json({
