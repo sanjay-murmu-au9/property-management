@@ -74,21 +74,47 @@ export const AppDataSource = new DataSource(dbConfig);
 const startServer = async () => {
   try {
     logger.info('Starting server initialization...');
-    logger.info('Database config:', {
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT,
-      database: process.env.DB_NAME,
-      username: process.env.DB_USER
+    logger.info('Environment:', {
+      NODE_ENV: process.env.NODE_ENV,
+      PORT: process.env.PORT,
+      CORS_ORIGIN: process.env.CORS_ORIGIN
     });
 
-    await AppDataSource.initialize();
-    logger.info('Database connection established');
+    // Initialize database connection with retries
+    let retries = 5;
+    while (retries > 0) {
+      try {
+        await AppDataSource.initialize();
+        logger.info('Database connection established successfully::::::');
+        break;
+      } catch (error) {
+        retries -= 1;
+        if (retries === 0) {
+          throw error;
+        }
+        logger.warn(`Failed to connect to database. Retries left: ${retries}`, error);
+        // Wait for 5 seconds before retrying
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
 
-    const PORT = process.env.PORT || 3000;
-    app.listen(PORT, () => {
+    const PORT = process.env.PORT || 15558;
+    const server = app.listen(PORT, () => {
       logger.info(`Server is running on port ${PORT} in ${process.env.NODE_ENV} mode`);
       logger.info(`CORS origin: ${process.env.CORS_ORIGIN}`);
     });
+
+    // Handle server shutdown
+    process.on('SIGTERM', () => {
+      logger.info('SIGTERM signal received. Closing server...');
+      server.close(async () => {
+        logger.info('Server closed. Closing database connection...');
+        await AppDataSource.destroy();
+        logger.info('Database connection closed.');
+        process.exit(0);
+      });
+    });
+
   } catch (error) {
     logger.error('Failed to start server:', error);
     if (error instanceof Error) {
@@ -98,6 +124,7 @@ const startServer = async () => {
         name: error.name
       });
     }
+    // Exit with error
     process.exit(1);
   }
 };

@@ -7,7 +7,7 @@ export class User implements IUser {
   id: string;
 
   @Column()
-  firstName: string;
+  firstName: string;  
 
   @Column()
   lastName: string;
