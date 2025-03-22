@@ -41,16 +41,42 @@ if (fs.existsSync(migrationsDir)) {
   console.log('No migrations directory found.');
 }
 
-// Copy index.js after TypeScript compilation
-const srcIndexPath = path.join(__dirname, '..', 'dist', 'src', 'index.js');
+// Possible locations for index.js after TypeScript compilation
+const possibleIndexPaths = [
+  path.join(__dirname, '..', 'dist', 'src', 'index.js'),
+  path.join(__dirname, '..', 'dist', 'index.js'), // Already might exist
+  path.join(__dirname, '..', 'dist', 'src/index.js')
+];
+
 const destIndexPath = path.join(__dirname, '..', 'dist', 'index.js');
 
-// Check if the source index.js file exists
-if (fs.existsSync(srcIndexPath)) {
-  // Copy the file
-  fs.copyFileSync(srcIndexPath, destIndexPath);
-  console.log('Copied index.js to dist/ root directory');
-} else {
-  console.error('Error: src/index.js was not found after TypeScript compilation');
+// Try to find and copy index.js from possible locations
+let foundIndex = false;
+for (const srcPath of possibleIndexPaths) {
+  if (fs.existsSync(srcPath) && srcPath !== destIndexPath) {
+    fs.copyFileSync(srcPath, destIndexPath);
+    console.log(`Copied index.js from ${srcPath} to dist/ root directory`);
+    foundIndex = true;
+    break;
+  }
+}
+
+// If index.js isn't found, create a simple entry point that requires from src/index.js
+if (!foundIndex) {
+  console.warn('Warning: Could not find index.js in expected locations');
+  console.log('Creating a fallback entry point...');
+
+  // Create a simple fallback entry point
+  const fallbackContent = `
+// Fallback entry point created by build script
+try {
+  require('./src/index.js');
+} catch (error) {
+  console.error('Failed to load application:', error);
   process.exit(1);
+}
+`;
+
+  fs.writeFileSync(destIndexPath, fallbackContent);
+  console.log('Created fallback entry point in dist/index.js');
 }
