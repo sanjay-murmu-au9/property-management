@@ -4,7 +4,6 @@ import { Contact } from '../models/Contact';
 import validator from 'validator';
 
 export class ContactController {
-  
   async submitContact(req: Request, res: Response): Promise<void> {
     try {
       const { name, email, comments } = req.body;
@@ -26,14 +25,22 @@ export class ContactController {
         return;
       }
 
-      // Check if email already exists and create new contact in a single transaction
-      await AppDataSource.transaction(async transactionalEntityManager => {
-        const existingContact = await transactionalEntityManager.findOne(Contact, {
-          where: { email },
-          select: ['id'] // Only fetch the id field for better performance
+      // Start a transaction
+      const queryRunner = AppDataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+
+      try {
+        // Get contact repository
+        const contactRepo = queryRunner.manager.getRepository(Contact);
+
+        // Check if email exists
+        const existingContact = await contactRepo.findOne({
+          where: { email }
         });
 
         if (existingContact) {
+          await queryRunner.rollbackTransaction();
           res.status(400).json({
             success: false,
             message: 'Email already exists'
@@ -42,20 +49,28 @@ export class ContactController {
         }
 
         // Create and save contact
-        const newContact = transactionalEntityManager.create(Contact, {
+        const newContact = contactRepo.create({
           name: validator.escape(name.trim()),
           email: email.toLowerCase().trim(),
           comments: validator.escape(comments.trim())
         });
 
-        const savedContact = await transactionalEntityManager.save(newContact);
+        const savedContact = await contactRepo.save(newContact);
+        await queryRunner.commitTransaction();
 
         res.status(201).json({
           success: true,
           message: 'Contact form submitted successfully',
           data: savedContact
         });
-      });
+      } catch (txError) {
+        // Rollback transaction on error
+        await queryRunner.rollbackTransaction();
+        throw txError; // Re-throw to be caught by outer catch
+      } finally {
+        // Release query runner
+        await queryRunner.release();
+      }
     } catch (error) {
       console.error('Error submitting contact form:', error);
       res.status(500).json({
