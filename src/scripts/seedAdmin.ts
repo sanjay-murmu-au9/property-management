@@ -1,18 +1,14 @@
 import 'reflect-metadata';
 import { config } from 'dotenv';
 import bcrypt from 'bcryptjs';
-import { DataSource } from 'typeorm';
+import { AppDataSource } from '../config/database';
 import { User } from '../models/User';
 import { UserRole } from '../types/models';
-import { dbConfig } from '../config/database';
 
 // Load environment variables
 config();
 
 const seedAdmin = async () => {
-  // Initialize database connection
-  const AppDataSource = new DataSource(dbConfig);
-  
   try {
     await AppDataSource.initialize();
     console.log('Database connection established');
