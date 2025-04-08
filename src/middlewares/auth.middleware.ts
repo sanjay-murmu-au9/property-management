@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
-import { AppDataSource } from '../index';
+import { AppDataSource } from '../config/database';
 
 // Extend Express Request type with proper User type
 declare global {

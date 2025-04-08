@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { AppDataSource } from '../index';
+import { AppDataSource } from '../config/database';
 import { User } from '../models/User';
 
 export class UserController {

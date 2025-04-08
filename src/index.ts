@@ -10,10 +10,10 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { config } from 'dotenv';
-import { DataSource } from 'typeorm';
-import { dbConfig } from './config/database';
+import { AppDataSource } from './config/database';
 import routes from './routes';
 import logger from './utils/logger';
+import campaignRouter from './routes/campaign.router';
 
 // Load environment variables
 config();
@@ -55,6 +55,7 @@ app.get('/api/health', (_req: Request, res: Response) => {
 
 // Routes
 app.use('/api', routes);
+app.use('/api/campaigns', campaignRouter);
 
 // Global error handler
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
@@ -76,69 +77,31 @@ app.use((req: Request, res: Response) => {
   });
 });
 
-// Initialize TypeORM connection and start server
-export const AppDataSource = new DataSource(dbConfig);
+// Initialize database connection
+AppDataSource.initialize()
+    .then(() => {
+        logger.info('Data Source has been initialized!');
+        
+        // Start server
+        const PORT = process.env.PORT || 15558;
+        const server = app.listen(PORT, () => {
+            logger.info(`Server is running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+            logger.info(`CORS origin: ${process.env.CORS_ORIGIN}`);
+        });
 
-const startServer = async () => {
-  try {
-    logger.info('Starting server initialization...');
-    logger.info('Environment:', {
-      NODE_ENV: process.env.NODE_ENV,
-      PORT: process.env.PORT,
-      CORS_ORIGIN: process.env.CORS_ORIGIN
+        // Handle server shutdown
+        process.on('SIGTERM', () => {
+            logger.info('SIGTERM signal received. Closing server...');
+            server.close(async () => {
+                logger.info('Server closed. Closing database connection...');
+                await AppDataSource.destroy();
+                logger.info('Database connection closed.');
+                process.exit(0);
+            });
+        });
+    })
+    .catch((error) => {
+        logger.error('Error during Data Source initialization:', error);
+        // Exit with error
+        process.exit(1);
     });
-
-    // Initialize database connection with retries
-    let retries = 5;
-    while (retries > 0) {
-      try {
-        await AppDataSource.initialize();
-        logger.info('Database connection established successfully::::::');
-        break;
-      } catch (error) {
-        retries -= 1;
-        if (retries === 0) {
-          throw error;
-        }
-        logger.warn(`Failed to connect to database. Retries left: ${retries}`, error);
-        // Wait for 5 seconds before retrying
-        await new Promise(resolve => setTimeout(resolve, 5000));
-      }
-    }
-
-    const PORT = process.env.PORT || 15558;
-    const server = app.listen(PORT, () => {
-      logger.info(`Server is running on port ${PORT} in ${process.env.NODE_ENV} mode`);
-      logger.info(`CORS origin: ${process.env.CORS_ORIGIN}`);
-    });
-
-    // Handle server shutdown
-    process.on('SIGTERM', () => {
-      logger.info('SIGTERM signal received. Closing server...');
-      server.close(async () => {
-        logger.info('Server closed. Closing database connection...');
-        await AppDataSource.destroy();
-        logger.info('Database connection closed.');
-        process.exit(0);
-      });
-    });
-
-  } catch (error) {
-    logger.error('Failed to start server:', error);
-    if (error instanceof Error) {
-      logger.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-      });
-    }
-    // Exit with error
-    process.exit(1);
-  }
-};
-
-// Start the server
-startServer().catch((error) => {
-  logger.error('Unhandled server startup error:', error);
-  process.exit(1);
-});

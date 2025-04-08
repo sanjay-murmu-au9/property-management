@@ -1,6 +1,6 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import { AppDataSource } from '../index';
+import { AppDataSource } from './database';
 import { User } from '../models/User';
 import { UserRole } from '../types/models';
 

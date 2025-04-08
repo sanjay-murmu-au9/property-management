@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { AppDataSource } from '../index';
+import { AppDataSource } from '../config/database';
 import { Contact } from '../models/Contact';
 import validator from 'validator';
 

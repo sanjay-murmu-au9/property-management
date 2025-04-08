@@ -1,4 +1,6 @@
-import { DataSourceOptions } from 'typeorm';
+import { DataSource } from 'typeorm';
+import { Campaign } from '../models/campaign';
+import { Contact } from '../models/Contact';
 import { config } from 'dotenv';
 import path from 'path';
 import logger from '../utils/logger';
@@ -19,32 +21,17 @@ if (process.env.DATABASE_URL) {
   }
 }
 
-// Create basic configuration
-const baseConfig = {
-  entities: [path.join(__dirname, '..', 'models', '*.{js,ts}')],
-  migrations: [path.join(__dirname, '..', '..', 'migrations', '*.{js,ts}')],
-  migrationsTableName: "migrations_history",
+// Export final configuration
+export const AppDataSource = new DataSource({
+  type: 'postgres',
+  url: `${process.env.DATABASE_URL}?sslmode=require`,
   synchronize: process.env.NODE_ENV === 'development',
   logging: process.env.NODE_ENV === 'development',
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  entities: [Campaign, Contact],
+  subscribers: [],
+  migrations: [path.join(__dirname, '..', '..', 'migrations', '*.{js,ts}')],
+  migrationsTableName: "migrations_history",
   extra: {
     max: 10 // connection pool max size
   }
-};
-
-// Export final configuration
-export const dbConfig: DataSourceOptions = process.env.DATABASE_URL
-  ? {
-      type: 'postgres',
-      url: process.env.DATABASE_URL,
-      ...baseConfig
-    }
-  : {
-      type: 'postgres',
-      host: process.env.DB_HOST,
-      port: parseInt(process.env.DB_PORT || '5432'),
-      username: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      ...baseConfig
-    };
+});

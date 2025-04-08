@@ -7,7 +7,7 @@ export class User implements IUser {
   id: string;
 
   @Column()
-  firstName: string;  
+  firstName: string;
 
   @Column()
   lastName: string;
@@ -25,7 +25,7 @@ export class User implements IUser {
   })
   role: UserRole;
 
-  @Column({ nullable: true })
+  @Column({ unique: true, length: 10 })
   phone: string;
 
   @Column({ default: true })
@@ -42,4 +42,4 @@ export class User implements IUser {
 
   @UpdateDateColumn()
   updatedAt: Date;
-} 
+}
