@@ -1,6 +1,11 @@
 import { DataSource } from 'typeorm';
 import { Campaign } from '../models/campaign';
 import { Contact } from '../models/Contact';
+import { User } from '../models/User';
+import { Property } from '../models/Property';
+import { Unit } from '../models/Unit';
+import { Lease } from '../models/Lease';
+//import { FileUpload } from '../models/FileUpload';
 import { config } from 'dotenv';
 import path from 'path';
 import logger from '../utils/logger';
@@ -27,7 +32,7 @@ export const AppDataSource = new DataSource({
   url: `${process.env.DATABASE_URL}?sslmode=require`,
   synchronize: process.env.NODE_ENV === 'development',
   logging: process.env.NODE_ENV === 'development',
-  entities: [Campaign, Contact],
+  entities: [Campaign, Contact, User, Property, Unit, Lease, /*FileUpload*/],
   subscribers: [],
   migrations: [path.join(__dirname, '..', '..', 'migrations', '*.{js,ts}')],
   migrationsTableName: "migrations_history",

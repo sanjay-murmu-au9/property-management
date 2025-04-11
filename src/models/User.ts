@@ -25,7 +25,7 @@ export class User implements IUser {
   })
   role: UserRole;
 
-  @Column({ unique: true, length: 10 })
+  @Column({ unique: true, length: 10, nullable: true })
   phone: string;
 
   @Column({ default: true })
