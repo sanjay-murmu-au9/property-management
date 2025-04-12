@@ -43,7 +43,7 @@ const fileFilter = (_req: Request, file: Express.Multer.File, callback: multer.F
 };
 
 // Export multer middleware
-export const upload = multer({
+const upload = multer({
   storage,
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter
