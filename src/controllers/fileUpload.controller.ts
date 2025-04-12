@@ -49,12 +49,18 @@ export const upload = multer({
   fileFilter
 });
 
+// Update the request type to include multer file
+interface MulterRequest extends Request {
+  file?: Express.Multer.File;
+}
+
 export class FileUploadController {
-  
+  static upload = upload;
+
   /**
    * Upload a single file to S3
    */
-  async uploadFile(req: Request, res: Response): Promise<void> {
+  static async uploadFile(req: MulterRequest, res: Response): Promise<void> {
     try {
       if (!req.file) {
         res.status(400).json({ message: 'No file uploaded' });
@@ -83,24 +89,34 @@ export class FileUploadController {
 
       const fileUrl = await getSignedUrl(s3Client, urlCommand, { expiresIn: 3600 });
 
-      res.status(201).json({
-        message: 'File uploaded successfully',
-        fileName,
-        fileUrl,
-        originalName: req.file.originalname,
+      // Save file information to database
+      const fileUploadRepository = AppDataSource.getRepository(FileUpload);
+      const fileUpload = fileUploadRepository.create({
+        fileName: req.file.originalname,
+        fileKey: fileName,
+        mimeType: req.file.mimetype,
         fileSize: req.file.size,
-        mimeType: req.file.mimetype
+        entityType: 'campaign',
+        entityId: req.body.entityId
+      });
+
+      await fileUploadRepository.save(fileUpload);
+
+      res.status(200).json({
+        message: 'File uploaded successfully',
+        fileUrl,
+        fileUpload
       });
     } catch (error) {
       console.error('Error uploading file:', error);
-      res.status(500).json({ message: 'File upload failed', error: error.message });
+      res.status(500).json({ message: 'Error uploading file', error: error.message });
     }
   }
   
   /**
    * Get a presigned URL for a file
    */
-  async getFile(req: Request, res: Response): Promise<void> {
+  static async getFile(req: Request, res: Response): Promise<void> {
     try {
       const { fileName } = req.params;
       
@@ -114,18 +130,18 @@ export class FileUploadController {
         Key: fileName
       });
 
-      const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-      res.status(200).json({ url });
+      const fileUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+      res.status(200).json({ fileUrl });
     } catch (error) {
-      console.error('Error getting file URL:', error);
-      res.status(500).json({ message: 'Failed to get file URL', error: error.message });
+      console.error('Error getting file:', error);
+      res.status(500).json({ message: 'Error getting file', error: error.message });
     }
   }
   
   /**
    * Delete a file from S3 and from the database
    */
-  async deleteFile(req: Request, res: Response): Promise<void> {
+  static async deleteFile(req: Request, res: Response): Promise<void> {
     try {
       const { fileName } = req.params;
       
@@ -140,17 +156,22 @@ export class FileUploadController {
       });
 
       await s3Client.send(command);
+
+      // Delete from database
+      const fileUploadRepository = AppDataSource.getRepository(FileUpload);
+      await fileUploadRepository.delete({ fileKey: fileName });
+
       res.status(200).json({ message: 'File deleted successfully' });
     } catch (error) {
       console.error('Error deleting file:', error);
-      res.status(500).json({ message: 'Failed to delete file', error: error.message });
+      res.status(500).json({ message: 'Error deleting file', error: error.message });
     }
   }
   
   /**
    * Get all files for a specific entity
    */
-  async getEntityFiles(req: Request, res: Response): Promise<void> {
+  static async getEntityFiles(req: Request, res: Response): Promise<void> {
     try {
       const { entityType, entityId } = req.params;
       

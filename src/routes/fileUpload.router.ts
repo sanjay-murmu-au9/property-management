@@ -1,20 +1,19 @@
 import { Router } from 'express';
-import { FileUploadController, upload } from '../controllers/fileUpload.controller';
+import { FileUploadController } from '../controllers/fileUpload.controller';
 import { auth } from '../middlewares/auth.middleware';
 
 const router = Router();
-const fileUploadController = new FileUploadController();
 
-// Upload file (authenticated)
-router.post('/upload', auth, upload.single('file'), (req, res) => fileUploadController.uploadFile(req, res));
+// Upload a single file
+router.post('/upload', auth, FileUploadController.upload.single('file'), FileUploadController.uploadFile);
 
-// Upload file for campaigns (no authentication)
-router.post('/campaign-upload', upload.single('file'), (req, res) => fileUploadController.uploadFile(req, res));
+// Get a file URL
+router.get('/:fileName', auth, FileUploadController.getFile);
 
-// Get file URL
-router.get('/:fileName', auth, (req, res) => fileUploadController.getFile(req, res));
+// Delete a file
+router.delete('/:fileName', auth, FileUploadController.deleteFile);
 
-// Delete file
-router.delete('/:fileName', auth, (req, res) => fileUploadController.deleteFile(req, res));
+// Get all files for an entity
+router.get('/entity/:entityType/:entityId', auth, FileUploadController.getEntityFiles);
 
 export default router; 
