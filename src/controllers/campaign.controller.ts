@@ -23,11 +23,21 @@ interface MulterRequest extends Request {
 }
 
 export class CampaignController {
+    // Helper method to generate pre-signed URL
+    private static async generatePresignedUrl(fileKey: string, expiresIn: number = 3600): Promise<string> {
+        const urlCommand = new GetObjectCommand({
+            Bucket: s3BucketName,
+            Key: fileKey
+        });
+        return await getSignedUrl(s3Client, urlCommand, { expiresIn });
+    }
+
     static async createCampaign(req: MulterRequest, res: Response) {
         try {
+            const campaignRepository = AppDataSource.getRepository(Campaign);
             const campaign = new Campaign();
-            
-            // Convert form-data to campaign object
+
+            // Construct data
             const campaignData = {
                 firstName: req.body.firstName,
                 lastName: req.body.lastName,
@@ -39,12 +49,12 @@ export class CampaignController {
                 employmentStatus: req.body.employmentStatus,
                 skills: req.body.skills,
                 experience: req.body.experience,
-                agreeToTerms: req.body.agreeToTerms === 'true' // Convert string to boolean
+                agreeToTerms: req.body.agreeToTerms === 'true',
             };
 
             Object.assign(campaign, campaignData);
 
-            // Validate the campaign object
+            // Validate
             const errors = await validate(campaign);
             if (errors.length > 0) {
                 return res.status(400).json({
@@ -57,10 +67,8 @@ export class CampaignController {
                 });
             }
 
-            // Check if user already exists
-            const campaignRepository = AppDataSource.getRepository(Campaign);
+            // Check for duplicate
             const existingUser = await campaignRepository.findOne({ where: { email: campaign.email } });
-
             if (existingUser) {
                 return res.status(400).json({
                     success: false,
@@ -68,15 +76,14 @@ export class CampaignController {
                 });
             }
 
-            // Save campaign first to get the ID
+            // Save campaign first
             const savedCampaign = await campaignRepository.save(campaign);
 
-            // Handle file upload if present
-            if (req.file) {
+            // Resume upload
+            if (req.file && req.file.buffer) {
                 const timestamp = Date.now();
                 const fileName = `${timestamp}-${req.file.originalname}`;
 
-                // Upload to S3
                 const command = new PutObjectCommand({
                     Bucket: s3BucketName,
                     Key: fileName,
@@ -86,15 +93,6 @@ export class CampaignController {
 
                 await s3Client.send(command);
 
-                // Get file URL
-                const urlCommand = new GetObjectCommand({
-                    Bucket: s3BucketName,
-                    Key: fileName
-                });
-
-                const fileUrl = await getSignedUrl(s3Client, urlCommand, { expiresIn: 3600 });
-
-                // Save file information to database
                 const fileUploadRepository = AppDataSource.getRepository(FileUpload);
                 const fileUpload = fileUploadRepository.create({
                     fileName: req.file.originalname,
@@ -106,9 +104,9 @@ export class CampaignController {
                 });
 
                 await fileUploadRepository.save(fileUpload);
-                
-                // Update campaign with resume URL
-                savedCampaign.resume = fileUrl;
+
+                // Update campaign with resume
+                savedCampaign.resume = fileName;
                 await campaignRepository.save(savedCampaign);
             }
 
@@ -119,19 +117,22 @@ export class CampaignController {
             });
 
         } catch (error) {
-            console.error('Error saving campaign details:', error);
+            console.error('Error saving campaign details:', error.message, error.stack);
             return res.status(500).json({
                 success: false,
-                message: 'Failed to save campaign details'
+                message: process.env.NODE_ENV === 'production'
+                    ? 'Failed to save campaign details'
+                    : error.message
             });
         }
     }
+
 
     static async updateCampaign(req: MulterRequest, res: Response) {
         try {
             const { id } = req.params;
             const campaignData = req.body;
-            
+
             const campaignRepository = AppDataSource.getRepository(Campaign);
             const campaign = await campaignRepository.findOne({ where: { id } });
 
@@ -157,14 +158,6 @@ export class CampaignController {
 
                 await s3Client.send(command);
 
-                // Get file URL
-                const urlCommand = new GetObjectCommand({
-                    Bucket: s3BucketName,
-                    Key: fileName
-                });
-
-                const fileUrl = await getSignedUrl(s3Client, urlCommand, { expiresIn: 3600 });
-
                 // Save file information to database
                 const fileUploadRepository = AppDataSource.getRepository(FileUpload);
                 const fileUpload = fileUploadRepository.create({
@@ -177,7 +170,7 @@ export class CampaignController {
                 });
 
                 await fileUploadRepository.save(fileUpload);
-                campaignData.resume = fileUrl;
+                campaignData.resume = fileName;
             }
 
             Object.assign(campaign, campaignData);
@@ -194,6 +187,38 @@ export class CampaignController {
             return res.status(500).json({
                 success: false,
                 message: 'Failed to update campaign'
+            });
+        }
+    }
+
+    // New method to get a fresh pre-signed URL for admin access
+    static async getFileAccessUrl(req: Request, res: Response) {
+        try {
+            const { campaignId } = req.params;
+
+            const campaignRepository = AppDataSource.getRepository(Campaign);
+            const campaign = await campaignRepository.findOne({ where: { id: campaignId } });
+
+            if (!campaign || !campaign.resume) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Campaign or resume not found'
+                });
+            }
+
+            // Generate a new pre-signed URL with longer expiration for admin access
+            const fileUrl = await this.generatePresignedUrl(campaign.resume, 86400); // 24 hours
+
+            return res.status(200).json({
+                success: true,
+                fileUrl
+            });
+
+        } catch (error) {
+            console.error('Error generating file access URL:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to generate file access URL'
             });
         }
     }
