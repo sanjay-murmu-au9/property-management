@@ -23,22 +23,13 @@ const app = express();
 
 // Production security configurations
 const corsOptions = {
-  origin: (origin: string | undefined, callback:(err: Error | null, allow?: boolean) => void) => {
-    const allowedOrigins = process.env.NODE_ENV === 'production'
-      ? (process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(o => o.trim()) : [])
-      : ['http://localhost:3000'];
-
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: process.env.NODE_ENV === 'production'
+    ? (process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:3000'])
+    : '*',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
-app.use(cors(corsOptions));
 
 
 // Middleware

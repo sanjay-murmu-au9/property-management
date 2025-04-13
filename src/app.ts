@@ -1,5 +1,4 @@
 import express from 'express';
-import cors from 'cors';
 import morgan from 'morgan';
 import passport from 'passport';
 import session from 'express-session';
@@ -9,9 +8,8 @@ import './config/passport';
 const app = express();
 
 // Middleware
-app.use(cors());
 app.use(morgan('dev'));
-app.use(express.json());
+
 
 // Session configuration
 app.use(
@@ -29,4 +27,4 @@ app.use(passport.session());
 // Routes
 app.use('/api', routes);
 
-export default app; 
+export default app;
