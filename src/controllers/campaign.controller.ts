@@ -23,14 +23,14 @@ interface MulterRequest extends Request {
 }
 
 export class CampaignController {
-    // Helper method to generate pre-signed URL
+    // 🔐 Generate a pre-signed URL to download file
     private static async generatePresignedUrl(fileKey: string, expiresIn: number = 3600): Promise<string> {
         const urlCommand = new GetObjectCommand({
-            Bucket: s3BucketName,
-            Key: fileKey
+          Bucket: s3BucketName,
+          Key: fileKey
         });
         return await getSignedUrl(s3Client, urlCommand, { expiresIn });
-    }
+      }
 
     static async createCampaign(req: MulterRequest, res: Response) {
         try {
@@ -90,7 +90,7 @@ export class CampaignController {
                     Body: req.file.buffer,
                     ContentType: req.file.mimetype
                 });
-
+                const fileUrl = await CampaignController.generatePresignedUrl(fileName, 86400);
                 await s3Client.send(command);
 
                 const fileUploadRepository = AppDataSource.getRepository(FileUpload);
@@ -106,7 +106,7 @@ export class CampaignController {
                 await fileUploadRepository.save(fileUpload);
 
                 // Update campaign with resume
-                savedCampaign.resume = fileName;
+                savedCampaign.resume = fileUrl;
                 await campaignRepository.save(savedCampaign);
             }
 
