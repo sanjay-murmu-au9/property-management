@@ -90,36 +90,36 @@ export class FileUploadController {
       const fileUrl = await getSignedUrl(s3Client, urlCommand, { expiresIn: 3600 });
 
       // Save file information to database
-      const fileUploadRepository = AppDataSource.getRepository(FileUpload);
-      const fileUpload = fileUploadRepository.create({
-        fileName: req.file.originalname,
-        fileKey: fileName,
-        mimeType: req.file.mimetype,
-        fileSize: req.file.size,
-        entityType: 'campaign',
-        entityId: req.body.entityId
-      });
+      // const fileUploadRepository = AppDataSource.getRepository(FileUpload);
+      // const fileUpload = fileUploadRepository.create({
+      //   fileName: req.file.originalname,
+      //   fileKey: fileName,
+      //   mimeType: req.file.mimetype,
+      //   fileSize: req.file.size,
+      //   entityType: 'campaign',
+      //   entityId: req.body.entityId
+      // });
 
-      await fileUploadRepository.save(fileUpload);
+      // await fileUploadRepository.save(fileUpload);
 
       res.status(200).json({
         message: 'File uploaded successfully',
         fileUrl,
-        fileUpload
+        // fileUpload
       });
     } catch (error) {
       console.error('Error uploading file:', error);
       res.status(500).json({ message: 'Error uploading file', error: error.message });
     }
   }
-  
+
   /**
    * Get a presigned URL for a file
    */
   static async getFile(req: Request, res: Response): Promise<void> {
     try {
       const { fileName } = req.params;
-      
+
       if (!fileName) {
         res.status(400).json({ message: 'File name is required' });
         return;
@@ -137,14 +137,14 @@ export class FileUploadController {
       res.status(500).json({ message: 'Error getting file', error: error.message });
     }
   }
-  
+
   /**
    * Delete a file from S3 and from the database
    */
   static async deleteFile(req: Request, res: Response): Promise<void> {
     try {
       const { fileName } = req.params;
-      
+
       if (!fileName) {
         res.status(400).json({ message: 'File name is required' });
         return;
@@ -167,19 +167,19 @@ export class FileUploadController {
       res.status(500).json({ message: 'Error deleting file', error: error.message });
     }
   }
-  
+
   /**
    * Get all files for a specific entity
    */
   static async getEntityFiles(req: Request, res: Response): Promise<void> {
     try {
       const { entityType, entityId } = req.params;
-      
+
       if (!entityType || !entityId) {
         res.status(400).json({ message: 'Entity type and entity ID are required' });
         return;
       }
-      
+
       // Get all files for this entity
       const fileRepository = AppDataSource.getRepository(FileUpload);
       const files = await fileRepository.find({
@@ -188,7 +188,7 @@ export class FileUploadController {
           entityId
         }
       });
-      
+
       // Generate presigned URLs for each file
       const filesWithUrls = await Promise.all(
         files.map(async (file) => {
@@ -202,13 +202,13 @@ export class FileUploadController {
           };
         })
       );
-      
+
       res.status(200).json(filesWithUrls);
-      
+
     } catch (error) {
       console.error('Error retrieving entity files:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       res.status(500).json({ message: 'Failed to retrieve files', error: errorMessage });
     }
   }
-} 
+}

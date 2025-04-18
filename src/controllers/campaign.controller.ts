@@ -49,6 +49,7 @@ export class CampaignController {
                 employmentStatus: req.body.employmentStatus,
                 skills: req.body.skills,
                 experience: req.body.experience,
+                resume:req.body.resume,
                 agreeToTerms: req.body.agreeToTerms === 'true',
             };
 
@@ -80,35 +81,35 @@ export class CampaignController {
             const savedCampaign = await campaignRepository.save(campaign);
 
             // Resume upload
-            if (req.file && req.file.buffer) {
-                const timestamp = Date.now();
-                const fileName = `${timestamp}-${req.file.originalname}`;
+            // if (req.file && req.file.buffer) {
+            //     const timestamp = Date.now();
+            //     const fileName = `${timestamp}-${req.file.originalname}`;
 
-                const command = new PutObjectCommand({
-                    Bucket: s3BucketName,
-                    Key: fileName,
-                    Body: req.file.buffer,
-                    ContentType: req.file.mimetype
-                });
-                const fileUrl = await CampaignController.generatePresignedUrl(fileName, 86400);
-                await s3Client.send(command);
+            //     const command = new PutObjectCommand({
+            //         Bucket: s3BucketName,
+            //         Key: fileName,
+            //         Body: req.file.buffer,
+            //         ContentType: req.file.mimetype
+            //     });
+            //     const fileUrl = await CampaignController.generatePresignedUrl(fileName, 86400);
+            //     await s3Client.send(command);
 
-                const fileUploadRepository = AppDataSource.getRepository(FileUpload);
-                const fileUpload = fileUploadRepository.create({
-                    fileName: req.file.originalname,
-                    fileKey: fileName,
-                    mimeType: req.file.mimetype,
-                    fileSize: req.file.size,
-                    entityType: 'campaign',
-                    entityId: savedCampaign.id
-                });
+            //     const fileUploadRepository = AppDataSource.getRepository(FileUpload);
+            //     const fileUpload = fileUploadRepository.create({
+            //         fileName: req.file.originalname,
+            //         fileKey: fileName,
+            //         mimeType: req.file.mimetype,
+            //         fileSize: req.file.size,
+            //         entityType: 'campaign',
+            //         entityId: savedCampaign.id
+            //     });
 
-                await fileUploadRepository.save(fileUpload);
+            //     await fileUploadRepository.save(fileUpload);
 
-                // Update campaign with resume
-                savedCampaign.resume = fileUrl;
-                await campaignRepository.save(savedCampaign);
-            }
+            //     // Update campaign with resume
+            //     savedCampaign.resume = fileUrl;
+            //     await campaignRepository.save(savedCampaign);
+            // }
 
             return res.status(200).json({
                 success: true,
