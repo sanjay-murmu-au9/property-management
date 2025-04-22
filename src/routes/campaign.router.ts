@@ -14,5 +14,7 @@ router.post('/', upload.single('file'), CampaignController.createCampaign);
 // Update campaign route with file upload support
 router.put('/:id', upload.single('file'), CampaignController.updateCampaign);
 
-export default router;
+// Parse resume for auto-filling form fields
+router.post('/parse-resume', CampaignController.parseResume);
 
+export default router;
